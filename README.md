@@ -1,4 +1,4 @@
-# :lemon: ramune
+# :lemon: ramune ![](https://img.shields.io/github/workflow/status/lunabunn/ramune/Rust)
 
 Another opinionated 2D game framework for Rust.
 
