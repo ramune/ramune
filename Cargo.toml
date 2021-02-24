@@ -1,0 +1,14 @@
+[package]
+name = "ramune"
+version = "0.1.0"
+authors = ["lunabunn <junmo.moon8@gmail.com>"]
+edition = "2018"
+
+[profile.release]
+lto = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kapp = { git = "https://github.com/kettle11/kapp", rev = "6f525c1" }
+gl33 = { version = "0.1", features = ["struct_loader"] }
