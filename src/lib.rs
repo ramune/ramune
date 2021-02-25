@@ -79,8 +79,9 @@ impl GameBuilder {
             .build()
             .unwrap();
         let mut gl_context = GLContext::new()
-            .version_major(3)
-            .version_minor(3)
+            .major_version(3)
+            .minor_version(2)
+            .srgb(true)
             .build()
             .unwrap();
         gl_context.set_window(Some(&window)).unwrap();

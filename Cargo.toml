@@ -10,5 +10,5 @@ lto = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kapp = { git = "https://github.com/kettle11/kapp", rev = "6f525c1" }
+kapp = { git = "https://github.com/kettle11/kapp", rev = "7d39a2f" }
 gl33 = { version = "0.1", features = ["struct_loader"] }

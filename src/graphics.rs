@@ -25,7 +25,7 @@ impl Graphics {
         let viewport_uniform;
 
         let vertex_shader_source = r#"
-            #version 330
+            #version 150
             
             in vec2 aPos;
             in vec4 aColor;
@@ -40,7 +40,7 @@ impl Graphics {
             }
         "#;
         let fragment_shader_source = r#"
-            #version 330
+            #version 150
             
             in vec4 vColor;
 
