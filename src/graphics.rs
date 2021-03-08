@@ -1,6 +1,7 @@
 use gl33::*;
 
-use crate::{Color, Gl};
+use crate::gl::Gl;
+use crate::Color;
 
 pub struct Graphics {
     gl: Gl,
@@ -20,126 +21,85 @@ impl Drop for Graphics {
 
 impl Graphics {
     pub fn new(gl: Gl) -> Self {
-        let mut vbo = 0;
-        let program;
-        let viewport_uniform;
-
         let vertex_shader_source = r#"
             #version 150
             
             in vec2 aPos;
+            in vec2 aTexCoords;
             in vec4 aColor;
 
             uniform vec2 uViewport;
-    
+        
+            out vec2 vTexCoords;
             out vec4 vColor;
     
             void main() {
                 gl_Position = vec4(aPos.x * 2 / uViewport.x - 1, 1 - aPos.y * 2 / uViewport.y, 0.0, 1.0);
+                vTexCoords = aTexCoords;
                 vColor = aColor;
             }
         "#;
         let fragment_shader_source = r#"
             #version 150
             
+            in vec2 vTexCoords;
             in vec4 vColor;
+
+            uniform sampler2D uSampler;
 
             out vec4 fragColor;
 
             void main() {
-                fragColor = vColor;
+                fragColor = vColor * texture(uSampler, vTexCoords);
             }
         "#;
 
         unsafe {
-            gl.GenBuffers(1, &mut vbo);
-
-            let vertex_shader = gl.CreateShader(GL_VERTEX_SHADER);
-            let c_str_vert = std::ffi::CString::new(vertex_shader_source).unwrap();
-            gl.ShaderSource(vertex_shader, 1, &c_str_vert.as_ptr(), std::ptr::null());
-            gl.CompileShader(vertex_shader);
-
-            let mut info_log_length = 0;
-            gl.GetShaderiv(vertex_shader, GL_INFO_LOG_LENGTH, &mut info_log_length);
-
-            let mut success = GL_FALSE as i32;
-            gl.GetShaderiv(vertex_shader, GL_COMPILE_STATUS, &mut success);
-            if success != GL_TRUE as i32 {
-                let mut info_log = String::with_capacity(info_log_length as _);
-                info_log.extend(std::iter::repeat('\0').take(info_log_length as _));
-                let mut length = 0;
-                gl.GetShaderInfoLog(
-                    vertex_shader,
-                    info_log_length,
-                    &mut length,
-                    (&info_log[..]).as_ptr() as *mut GLchar,
-                );
-                info_log.truncate(length as _);
-                eprintln!("Vertex shader failed to compile!\n{}", info_log,);
-            }
-
-            let fragment_shader = gl.CreateShader(GL_FRAGMENT_SHADER);
-            let c_str_frag = std::ffi::CString::new(fragment_shader_source).unwrap();
-            gl.ShaderSource(fragment_shader, 1, &c_str_frag.as_ptr(), std::ptr::null());
-            gl.CompileShader(fragment_shader);
-
-            let mut success = GL_FALSE as i32;
-            gl.GetShaderiv(fragment_shader, GL_COMPILE_STATUS, &mut success);
-            if success != GL_TRUE as i32 {
-                let mut info_log = String::with_capacity(info_log_length as _);
-                info_log.extend(std::iter::repeat('\0').take(info_log_length as _));
-                let mut length = 0;
-                gl.GetShaderInfoLog(
-                    fragment_shader,
-                    info_log_length,
-                    &mut length,
-                    (&info_log[..]).as_ptr() as *mut GLchar,
-                );
-                info_log.truncate(length as _);
-                eprintln!("Fragment shader failed to compile!\n{}", info_log,);
-            }
-
-            program = gl.CreateProgram();
-            gl.AttachShader(program, vertex_shader);
-            gl.AttachShader(program, fragment_shader);
-            gl.LinkProgram(program);
-
-            let mut success = GL_FALSE as i32;
-            gl.GetProgramiv(program, GL_LINK_STATUS, &mut success);
-            if success != GL_TRUE as i32 {
-                let mut info_log = String::with_capacity(info_log_length as _);
-                info_log.extend(std::iter::repeat('\0').take(info_log_length as _));
-                let mut length = 0;
-                gl.GetProgramInfoLog(
-                    fragment_shader,
-                    info_log_length,
-                    &mut length,
-                    (&info_log[..]).as_ptr() as *mut GLchar,
-                );
-                info_log.truncate(length as _);
-                eprintln!("Shader program failed to link!\n{}", info_log,);
-            }
+            let vbo = gl.create_vbo();
+            let program = gl
+                .create_program(vertex_shader_source, fragment_shader_source)
+                .expect("Failed to create shader program");
 
             gl.UseProgram(program);
             gl.BindBuffer(GL_ARRAY_BUFFER, vbo);
+
             gl.EnableVertexAttribArray(0);
             gl.EnableVertexAttribArray(1);
-            // glVertexAttribPointer(index, size (# of values), type, stride (bytes), pointer (bytes))
-            gl.VertexAttribPointer(0, 2, GL_FLOAT, 0, 6 * 4, 0 as *const std::ffi::c_void);
-            gl.VertexAttribPointer(1, 4, GL_FLOAT, 0, 6 * 4, (2 * 4) as *const std::ffi::c_void);
+            gl.EnableVertexAttribArray(2);
+            
+            #[allow(clippy::erasing_op)]
+            gl.VertexAttribPointer(0, 2, GL_FLOAT, 0, 8 * 4, (0 * 4) as *const std::ffi::c_void);
+            gl.VertexAttribPointer(1, 2, GL_FLOAT, 0, 8 * 4, (2 * 4) as *const std::ffi::c_void);
+            gl.VertexAttribPointer(2, 4, GL_FLOAT, 0, 8 * 4, (4 * 4) as *const std::ffi::c_void);
+            // gl.VertexAttribPointer(index, size (# of values), type, stride (bytes), pointer (bytes));
 
-            let c_str = std::ffi::CString::new("uViewport").unwrap();
-            viewport_uniform = gl.GetUniformLocation(program, c_str.as_ptr());
             let mut viewport = [0; 4];
             gl.GetIntegerv(GL_VIEWPORT, viewport.as_mut_ptr());
+            let viewport_uniform = gl.get_uniform_location(program, "uViewport");
             gl.Uniform2f(viewport_uniform, viewport[2] as _, viewport[3] as _);
-        }
 
-        Self {
-            gl,
-            vbo,
-            program,
-            viewport_uniform,
+            let mut blank_texture = 0;
+            gl.GenTextures(1, &mut blank_texture);
+            gl.BindTexture(GL_TEXTURE_2D, blank_texture);
+            gl.ActiveTexture(GL_TEXTURE0);
+            gl.TexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                GL_RGB as _,
+                1,
+                1,
+                0,
+                GL_RGB,
+                GL_UNSIGNED_BYTE,
+                [255_u8, 255_u8, 255_u8].as_ptr().cast(),
+            );
+
+            Self {
+                gl,
+                vbo,
+                program,
+                viewport_uniform,
+            }
         }
     }
 
@@ -158,8 +118,8 @@ impl Graphics {
         }
     }
 
-    pub fn push(&mut self) -> Painter<'_> {
-        Painter {
+    pub fn push(&mut self) -> GraphicsScope<'_> {
+        GraphicsScope {
             graphics: self,
             depth: 0.,
             color: Color::WHITE,
@@ -168,7 +128,7 @@ impl Graphics {
     }
 }
 
-pub struct Painter<'a> {
+pub struct GraphicsScope<'a> {
     graphics: &'a mut Graphics,
     depth: f32,
     color: Color,
@@ -184,7 +144,7 @@ struct Batch {
     vert_count: usize,
 }
 
-impl Drop for Painter<'_> {
+impl Drop for GraphicsScope<'_> {
     fn drop(&mut self) {
         let mut batches = Vec::new();
         let mut verts = Vec::<f32>::new();
@@ -192,13 +152,13 @@ impl Drop for Painter<'_> {
             .sort_by(|a, b| a.depth.partial_cmp(&b.depth).unwrap());
         for command in self.commands.iter() {
             verts.extend(command.verts.iter());
-            if batches.len() == 0 {
+            if batches.is_empty() {
                 batches.push(Batch { vert_count: 0 });
             }
             batches[0].vert_count += command.verts.len();
         }
         self.commands.clear();
-        if verts.len() == 0 {
+        if verts.is_empty() {
             return;
         }
 
@@ -223,7 +183,7 @@ impl Drop for Painter<'_> {
     }
 }
 
-impl Painter<'_> {
+impl GraphicsScope<'_> {
     pub fn set_depth(&mut self, depth: f32) {
         self.depth = depth;
     }
@@ -237,36 +197,48 @@ impl Painter<'_> {
             verts: vec![
                 x,
                 y,
+                0.,
+                1.,
                 self.color.r,
                 self.color.g,
                 self.color.b,
                 self.color.a,
                 x,
                 y + height,
+                0.,
+                0.,
                 self.color.r,
                 self.color.g,
                 self.color.b,
                 self.color.a,
                 x + width,
                 y,
+                1.,
+                1.,
                 self.color.r,
                 self.color.g,
                 self.color.b,
                 self.color.a,
                 x + width,
                 y,
+                1.,
+                1.,
                 self.color.r,
                 self.color.g,
                 self.color.b,
                 self.color.a,
                 x,
                 y + height,
+                0.,
+                0.,
                 self.color.r,
                 self.color.g,
                 self.color.b,
                 self.color.a,
                 x + width,
                 y + height,
+                1.,
+                0.,
                 self.color.r,
                 self.color.g,
                 self.color.b,
